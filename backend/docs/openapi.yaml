@@ -1,0 +1,337 @@
+openapi: 3.0.3
+info:
+  title: E-Bookstore API
+  version: 1.0.0
+  description: Browse, select and buy books. Covers auth, catalogue, cart, checkout, payment and orders.
+servers:
+  - url: http://localhost:8080/api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+  - name: Catalogue
+  - name: Cart
+  - name: Addresses
+  - name: Orders
+  - name: Payments
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Register a new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RegisterRequest' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '409': { description: Email already exists }
+  /auth/login:
+    post:
+      tags: [Auth]
+      security: []
+      summary: Log in and receive a JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AuthResponse' } } } }
+        '401': { description: Invalid credentials }
+  /users/me:
+    get:
+      tags: [Auth]
+      summary: Current user profile (includes gift points)
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+  /categories:
+    get:
+      tags: [Catalogue]
+      summary: List categories
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Category' } } } } }
+  /brands:
+    get:
+      tags: [Catalogue]
+      summary: List brands
+      parameters:
+        - { name: categoryId, in: query, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Brand' } } } } }
+  /products:
+    get:
+      tags: [Catalogue]
+      summary: Search / filter products
+      parameters:
+        - { name: categoryId, in: query, schema: { type: integer, format: int64 } }
+        - { name: brandId, in: query, schema: { type: integer, format: int64 } }
+        - { name: q, in: query, description: Title or author search, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/ProductPage' } } } }
+  /products/{id}:
+    get:
+      tags: [Catalogue]
+      summary: Product details with tentative delivery date
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Product' } } } }
+        '404': { description: Not found }
+  /products/{id}/related:
+    get:
+      tags: [Catalogue]
+      summary: Related products
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Product' } } } } }
+  /products/recommendations:
+    get:
+      tags: [Catalogue]
+      summary: Recommendations based on the user's order history
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Product' } } } } }
+  /cart:
+    get:
+      tags: [Cart]
+      summary: View cart
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+    delete:
+      tags: [Cart]
+      summary: Clear cart
+      responses:
+        '204': { description: Cleared }
+  /cart/items:
+    post:
+      tags: [Cart]
+      summary: Add a product to the cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartItemRequest' }
+      responses:
+        '200': { description: Updated cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+        '409': { description: Insufficient stock }
+  /cart/items/{productId}:
+    put:
+      tags: [Cart]
+      summary: Update quantity
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CartItemRequest' }
+      responses:
+        '200': { description: Updated cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+    delete:
+      tags: [Cart]
+      summary: Remove an item
+      parameters:
+        - { name: productId, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Updated cart, content: { application/json: { schema: { $ref: '#/components/schemas/Cart' } } } }
+  /addresses:
+    get:
+      tags: [Addresses]
+      summary: List delivery addresses
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Address' } } } } }
+    post:
+      tags: [Addresses]
+      summary: Add a delivery address
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Address' }
+      responses:
+        '201': { description: Created, content: { application/json: { schema: { $ref: '#/components/schemas/Address' } } } }
+  /orders:
+    get:
+      tags: [Orders]
+      summary: Order history (powers "Buy it again")
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Order' } } } } }
+    post:
+      tags: [Orders]
+      summary: Checkout - create an order from the cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CheckoutRequest' }
+      responses:
+        '201': { description: Order placed, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '400': { description: Empty cart or invalid gift points }
+  /orders/{id}:
+    get:
+      tags: [Orders]
+      summary: Order details
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '404': { description: Not found }
+  /orders/{id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Cancel an order (only within 48 hours of placing it)
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        '200': { description: Cancelled, content: { application/json: { schema: { $ref: '#/components/schemas/Order' } } } }
+        '409': { description: Cancellation window (48h) has passed }
+  /orders/{id}/payment:
+    post:
+      tags: [Payments]
+      summary: Pay for an order
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentRequest' }
+      responses:
+        '200': { description: Payment result, content: { application/json: { schema: { $ref: '#/components/schemas/Payment' } } } }
+        '402': { description: Payment failed }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer, bearerFormat: JWT }
+  schemas:
+    RegisterRequest:
+      type: object
+      required: [email, password, fullName]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 8 }
+        fullName: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string }
+    AuthResponse:
+      type: object
+      properties:
+        token: { type: string }
+        user: { $ref: '#/components/schemas/User' }
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        email: { type: string }
+        fullName: { type: string }
+        giftPoints: { type: integer }
+    Category:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+    Brand:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+    Product:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        title: { type: string }
+        author: { type: string }
+        description: { type: string }
+        price: { type: number, format: double }
+        stock: { type: integer }
+        imageUrl: { type: string }
+        category: { $ref: '#/components/schemas/Category' }
+        brand: { $ref: '#/components/schemas/Brand' }
+        tentativeDeliveryDate: { type: string, format: date }
+    ProductPage:
+      type: object
+      properties:
+        content: { type: array, items: { $ref: '#/components/schemas/Product' } }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+    CartItemRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: integer, format: int64 }
+        quantity: { type: integer, minimum: 1 }
+    CartItem:
+      type: object
+      properties:
+        product: { $ref: '#/components/schemas/Product' }
+        quantity: { type: integer }
+        lineTotal: { type: number, format: double }
+    Cart:
+      type: object
+      properties:
+        items: { type: array, items: { $ref: '#/components/schemas/CartItem' } }
+        subtotal: { type: number, format: double }
+    Address:
+      type: object
+      required: [line1, city, postalCode, country]
+      properties:
+        id: { type: integer, format: int64, readOnly: true }
+        line1: { type: string }
+        line2: { type: string }
+        city: { type: string }
+        state: { type: string }
+        postalCode: { type: string }
+        country: { type: string }
+        isDefault: { type: boolean }
+    CheckoutRequest:
+      type: object
+      required: [addressId]
+      properties:
+        addressId: { type: integer, format: int64 }
+        giftPointsToRedeem: { type: integer, minimum: 0, default: 0 }
+    OrderItem:
+      type: object
+      properties:
+        productId: { type: integer, format: int64 }
+        title: { type: string }
+        quantity: { type: integer }
+        unitPrice: { type: number, format: double }
+        expectedDelivery: { type: string, format: date }
+    Order:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        status: { type: string, enum: [PLACED, PAID, CANCELLED, DELIVERED] }
+        items: { type: array, items: { $ref: '#/components/schemas/OrderItem' } }
+        subtotal: { type: number, format: double }
+        giftPointsUsed: { type: integer }
+        total: { type: number, format: double }
+        createdAt: { type: string, format: date-time }
+        cancellableUntil: { type: string, format: date-time }
+    PaymentRequest:
+      type: object
+      required: [method]
+      properties:
+        method: { type: string, enum: [CREDIT_CARD, DEBIT_CARD, GIFT_POINTS] }
+        cardNumber: { type: string, description: Used only to simulate payment; never persisted }
+        cardHolder: { type: string }
+        expiry: { type: string, example: "12/28" }
+        cvv: { type: string }
+    Payment:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        orderId: { type: integer, format: int64 }
+        method: { type: string }
+        amount: { type: number, format: double }
+        status: { type: string, enum: [SUCCESS, FAILED, REFUNDED] }
+        message: { type: string, example: Your purchase is complete }
